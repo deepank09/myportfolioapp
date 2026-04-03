@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Portfolio Manager & Projector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        .input-no-spin::-webkit-outer-spin-button,
+        .input-no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .input-no-spin { -moz-appearance: textfield; }
+        .tooltip { position: relative; display: inline-block; }
+        .tooltip .tooltiptext {
+            visibility: hidden; width: 240px; background-color: #1e293b; color: #fff; text-align: center;
+            border-radius: 6px; padding: 8px; position: absolute; z-index: 10; bottom: 125%;
+            left: 50%; margin-left: -120px; opacity: 0; transition: opacity 0.3s; font-size: 0.75rem;
+        }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+        .chart-container { position: relative; margin: auto; height: 60vh; width: 100%; max-width: 1000px; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 md:p-8">
+    <div class="container mx-auto max-w-7xl bg-white shadow-xl rounded-2xl p-6 md:p-8 border-t-4 border-indigo-600">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-indigo-700 tracking-tight">Dynamic Portfolio Manager</h1>
+            <p class="text-gray-500 mt-2">Set your budget, let the algorithm distribute it, or fine-tune it manually.</p>
+        </header>
+
+        <!-- Master Control Panel -->
+        <div class="bg-indigo-50 border border-indigo-100 p-6 rounded-xl mb-8 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+            <div class="flex-1 w-full">
+                <label class="block text-sm font-bold text-indigo-800 mb-1">Total Monthly Budget</label>
+                <div class="relative">
+                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">₹</span>
+                    <input type="number" id="masterTotalInput" value="133100" class="input-no-spin w-full bg-white border border-gray-300 rounded-lg py-3 pl-8 pr-4 text-lg font-bold text-gray-800 focus:ring-2 focus:ring-indigo-500 outline-none shadow-inner">
+                </div>
+            </div>
+            <div class="flex-1 w-full md:pt-6 flex gap-3">
+                <button onclick="distributeTotal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-md">
+                    Distribute Proportionally
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+            <!-- Left Panel: Investments -->
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-white p-5 border border-gray-200 rounded-xl shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Asset Allocation
+                        </h2>
+                        <span class="text-xs text-gray-400">Edits auto-balance</span>
+                    </div>
+                    <div id="investments-list" class="space-y-3 max-h-[50vh] overflow-y-auto pr-2"></div>
+                </div>
+
+                <div class="bg-slate-800 p-5 rounded-xl shadow-lg text-white relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-indigo-500 opacity-20 rounded-full blur-xl"></div>
+                    <h2 class="text-lg font-bold mb-4">Current Structure</h2>
+                    <div class="space-y-3">
+                        <div class="flex justify-between border-b border-slate-700 pb-2">
+                            <span class="text-slate-300">Total Validated SIP:</span>
+                            <span id="validatedTotal" class="font-bold text-xl text-green-400">₹0</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 pt-2 text-center">
+                            <div class="bg-slate-700/50 p-2 rounded-lg border border-slate-600">
+                                <div class="text-[10px] uppercase text-slate-400 tracking-wider">Equity</div>
+                                <div id="overallEquity" class="font-bold text-sm">0%</div>
+                            </div>
+                            <div class="bg-slate-700/50 p-2 rounded-lg border border-slate-600">
+                                <div class="text-[10px] uppercase text-slate-400 tracking-wider">Debt</div>
+                                <div id="overallDebt" class="font-bold text-sm">0%</div>
+                            </div>
+                            <div class="bg-slate-700/50 p-2 rounded-lg border border-slate-600">
+                                <div class="text-[10px] uppercase text-slate-400 tracking-wider">Cash</div>
+                                <div id="overallCash" class="font-bold text-sm">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Projections -->
+            <div class="lg:col-span-2 bg-white p-6 border border-gray-200 rounded-xl shadow-sm">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <h2 class="text-xl font-bold text-gray-800">Growth Trajectory</h2>
+                    <div class="flex items-center space-x-3 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
+                        <label for="yearsToProject" class="text-sm font-medium text-gray-600 pl-2">Time Horizon:</label>
+                        <select id="yearsToProject" class="p-1 border-0 bg-transparent text-sm font-bold text-indigo-600 focus:outline-none cursor-pointer">
+                            <option value="5">5 Years</option>
+                            <option value="10" selected>10 Years</option>
+                            <option value="15">15 Years</option>
+                            <option value="20">20 Years</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="chart-container"><canvas id="projectionChart"></canvas></div>
+                <div id="projectionSummary" class="mt-6 grid grid-cols-1 gap-4"></div>
+            </div>
+
+            <!-- Bottom Panel: Small-Cap Selector -->
+            <div class="lg:col-span-3 bg-white p-6 border border-gray-200 rounded-xl shadow-sm mt-4">
+                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Small-Cap Engine Selection</h2>
+                        <p class="text-sm text-gray-500 mt-1">Select the fund to occupy your 6% small-cap target allocation.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 w-full md:w-auto">
+                        <select id="smallCapSelect" class="p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none flex-1 md:w-64"></select>
+                        <button onclick="replacePlaceholder()" id="replacePlaceholderBtn" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-6 rounded-lg transition shadow-md whitespace-nowrap">
+                            Select Fund
+                        </button>
+                    </div>
+                 </div>
+
+                 <div class="overflow-x-auto rounded-lg border border-gray-100">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-600 uppercase bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-4 font-bold">Fund Name</th>
+                                <th class="px-6 py-4 font-bold text-center">AUM (Cr)</th>
+                                <th class="px-6 py-4 font-bold text-center">3Y CAGR</th>
+                                <th class="px-6 py-4 font-bold text-center">5Y CAGR</th>
+                                <th class="px-6 py-4 font-bold text-center">Alpha</th>
+                                <th class="px-6 py-4 font-bold text-center">Exp. Ratio</th>
+                            </tr>
+                        </thead>
+                        <tbody id="small-cap-table-body" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Strategy Target Weights based on the 133,100 optimization analysis
+        // Note: sbi_conservative & sbi_smallcap are structurally 0% in the new strategy.
+        let investments = [
+            { id: "hdfc_balanced", name: "HDFC Balanced Adv", originalAmount: 56900.25, amount: 0, targetWeight: 0.35, type: "Hybrid", assetMix: { equity: 0.60, debt: 0.28, cash: 0.12 } },
+            { id: "icici_bluechip", name: "ICICI Pru Bluechip", originalAmount: 27951, amount: 0, targetWeight: 0.21, type: "Equity", assetMix: { equity: 0.92, debt: 0.02, cash: 0.06 } },
+            { id: "motilal_midcap", name: "Motilal Oswal Midcap 150", originalAmount: 9982.50, amount: 0, targetWeight: 0.19, type: "Equity", assetMix: { equity: 0.99, debt: 0, cash: 0.01 } },
+            { id: "nippon_multi", name: "Nippon Multi Cap", originalAmount: 2994.75, amount: 0, targetWeight: 0.11, type: "Equity", assetMix: { equity: 0.97, debt: 0, cash: 0.03 } },
+            { id: "rd", name: "Recurring Deposit (RD)", originalAmount: 27000, amount: 0, targetWeight: 0.08, type: "RD" },
+            { id: "placeholder", name: "Small-Cap Placeholder", originalAmount: 0, amount: 0, targetWeight: 0.06, type: "Cash" },
+            { id: "sbi_conservative", name: "SBI Conservative (Exited)", originalAmount: 6275, amount: 0, targetWeight: 0.00, type: "Hybrid", assetMix: { equity: 0.23, debt: 0.73, cash: 0.04 } },
+            { id: "sbi_smallcap", name: "SBI Small Cap (Exited)", originalAmount: 1996.50, amount: 0, targetWeight: 0.00, type: "Equity", assetMix: { equity: 0.80, debt: 0, cash: 0.20 } }
+        ];
+
+        const smallCapResearch = [
+            { id: "bandhan_sc", name: "Bandhan Small Cap Fund", aum: 5520, cagr3: 39.8, cagr5: 30.5, alpha: 11.2, exp: 0.38, color: "text-orange-600" },
+            { id: "nippon_sc", name: "Nippon India Small Cap", aum: 51560, cagr3: 34.9, cagr5: 31.8, alpha: 8.2, exp: 0.70, color: "text-blue-600" },
+            { id: "quant_sc", name: "Quant Small Cap Fund", aum: 21240, cagr3: 45.2, cagr5: 45.8, alpha: 16.5, exp: 0.77, color: "text-red-600" },
+            { id: "hdfc_sc", name: "HDFC Small Cap Fund", aum: 28600, cagr3: 31.5, cagr5: 27.9, alpha: 6.1, exp: 0.76, color: "text-indigo-600" }
+        ];
+
+        const returns = { equity: 0.12, debt: 0.07, rd: 0.065, cash: 0.035 };
+        let chart = null;
+
+        function format(val) { return `₹${val.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
+
+        function calculateExpectedReturn(inv) {
+            if (inv.id === 'placeholder' || inv.type === 'Cash') return returns.cash;
+            if (inv.type === 'RD') return returns.rd;
+            if (inv.assetMix) {
+                return (inv.assetMix.equity * returns.equity) + (inv.assetMix.debt * returns.debt) + (inv.assetMix.cash * returns.cash);
+            }
+            return returns.equity;
+        }
+
+        // --- Core Automation Logic ---
+
+        function distributeTotal() {
+            const inputVal = parseFloat(document.getElementById('masterTotalInput').value);
+            if (isNaN(inputVal) || inputVal <= 0) return;
+
+            investments.forEach(inv => {
+                inv.amount = inputVal * inv.targetWeight;
+            });
+            updateAll();
+        }
+
+        function handleFundEdit(editedId, newAmount) {
+            const masterTotal = parseFloat(document.getElementById('masterTotalInput').value) || 0;
+            const fund = investments.find(i => i.id === editedId);
+
+            // Validate input bounds
+            let safeAmount = parseFloat(newAmount);
+            if(isNaN(safeAmount)) safeAmount = 0;
+            safeAmount = Math.max(0, Math.min(safeAmount, masterTotal));
+
+            const difference = fund.amount - safeAmount; // If reduced, difference is positive
+            fund.amount = safeAmount;
+
+            if (difference !== 0) {
+                // Find eligible funds to receive/absorb the difference (exclude edited fund and exited funds)
+                const otherFunds = investments.filter(i => i.id !== editedId && i.targetWeight > 0);
+                const sumWeights = otherFunds.reduce((s, i) => s + i.targetWeight, 0);
+
+                if (sumWeights > 0) {
+                    otherFunds.forEach(f => {
+                        const proportion = f.targetWeight / sumWeights;
+                        f.amount += (difference * proportion);
+                        // Prevent amounts from going negative if user dramatically increased one fund
+                        if (f.amount < 0) f.amount = 0;
+                    });
+                }
+            }
+
+            // Readjust total input just in case clamping caused a slight mismatch
+            const actualNewTotal = investments.reduce((s, i) => s + i.amount, 0);
+            if(Math.abs(actualNewTotal - masterTotal) > 1) {
+                document.getElementById('masterTotalInput').value = Math.round(actualNewTotal);
+            }
+
+            updateAll();
+        }
+
+        // --- UI Rendering ---
+
+        function renderInvestments() {
+            const list = document.getElementById('investments-list');
+            list.innerHTML = '';
+            const total = investments.reduce((s, i) => s + (i.amount || 0), 0);
+
+            investments.forEach(inv => {
+                // Don't render exited funds if their amount is 0 and weight is 0
+                if (inv.targetWeight === 0 && inv.amount === 0) return;
+
+                const actualPerc = total > 0 ? ((inv.amount || 0) / total * 100).toFixed(1) : 0;
+                const targetPerc = (inv.targetWeight * 100).toFixed(0);
+
+                const div = document.createElement('div');
+                div.className = 'p-3 bg-gray-50 border border-gray-100 rounded-lg relative transition-all hover:shadow-md';
+                div.innerHTML = `
+                    <div class="flex justify-between items-center text-xs font-semibold text-gray-600 mb-2">
+                        <span>${inv.name}</span>
+                        <div class="space-x-1">
+                            <span class="bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded text-[10px]" title="Target Strategy Weight">TGT: ${targetPerc}%</span>
+                            <span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded" title="Current Actual Allocation">${actualPerc}%</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-400 font-bold">₹</span>
+                        <input type="number" id="inp-${inv.id}" value="${(inv.amount || 0).toFixed(0)}"
+                               class="input-no-spin w-full bg-white border border-gray-300 rounded p-1.5 text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow">
+                    </div>
+                `;
+                list.appendChild(div);
+
+                // Attach change listener for automatic redistribution
+                document.getElementById(`inp-${inv.id}`).addEventListener('blur', (e) => {
+                    handleFundEdit(inv.id, e.target.value);
+                });
+                // Also trigger on 'Enter' key
+                document.getElementById(`inp-${inv.id}`).addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') handleFundEdit(inv.id, e.target.value);
+                });
+            });
+        }
+
+        function updateAll() {
+            renderInvestments();
+            renderSummary();
+            projectGrowth();
+        }
+
+        function renderSummary() {
+            let total = 0, eq = 0, dt = 0, cs = 0;
+            investments.forEach(i => {
+                const amt = i.amount || 0;
+                total += amt;
+                const e = i.assetMix ? i.assetMix.equity : (i.type === 'Equity' ? 1 : 0);
+                const d = i.assetMix ? i.assetMix.debt : (i.type === 'RD' ? 1 : 0);
+                const c = i.assetMix ? i.assetMix.cash : ((i.type === 'Cash' || i.category === 'Cash') ? 1 : 0);
+                eq += amt * e; dt += amt * d; cs += amt * c;
+            });
+            document.getElementById('validatedTotal').innerText = format(total);
+            document.getElementById('overallEquity').innerText = (total > 0 ? (eq/total*100).toFixed(0) : 0) + '%';
+            document.getElementById('overallDebt').innerText = (total > 0 ? (dt/total*100).toFixed(0) : 0) + '%';
+            document.getElementById('overallCash').innerText = (total > 0 ? (cs/total*100).toFixed(0) : 0) + '%';
+        }
+
+        function renderResearch() {
+            const body = document.getElementById('small-cap-table-body');
+            const select = document.getElementById('smallCapSelect');
+            body.innerHTML = ''; select.innerHTML = '';
+            smallCapResearch.forEach(f => {
+                body.innerHTML += `
+                    <tr class="hover:bg-gray-100 transition">
+                        <td class="px-6 py-3 font-bold ${f.color}">${f.name}</td>
+                        <td class="px-6 py-3 text-center text-gray-600">${f.aum.toLocaleString()}</td>
+                        <td class="px-6 py-3 text-center font-bold text-green-600">${f.cagr3}%</td>
+                        <td class="px-6 py-3 text-center text-gray-600">${f.cagr5}%</td>
+                        <td class="px-6 py-3 text-center font-bold text-indigo-600">${f.alpha}%</td>
+                        <td class="px-6 py-3 text-center text-gray-500">${f.exp}%</td>
+                    </tr>
+                `;
+                select.innerHTML += `<option value="${f.id}">${f.name}</option>`;
+            });
+        }
+
+        function replacePlaceholder() {
+            const selId = document.getElementById('smallCapSelect').value;
+            const fund = smallCapResearch.find(f => f.id === selId);
+            const pIdx = investments.findIndex(i => i.id === 'placeholder');
+
+            if(pIdx > -1) {
+                const pFund = investments[pIdx];
+                investments.splice(pIdx, 1, {
+                    id: fund.id, name: fund.name, originalAmount: 0,
+                    type: "Equity", category: "SmallCap",
+                    amount: pFund.amount, targetWeight: pFund.targetWeight,
+                    expectedReturn: returns.equity
+                });
+
+                const btn = document.getElementById('replacePlaceholderBtn');
+                btn.disabled = true;
+                btn.classList.replace('bg-slate-800', 'bg-green-600');
+                btn.innerText = '✓ Selected';
+                updateAll();
+            }
+        }
+
+        function projectGrowth() {
+            const yrs = parseInt(document.getElementById('yearsToProject').value);
+            const labels = Array.from({length: yrs + 1}, (_, i) => `Year ${i}`);
+
+            const run = (sipSet) => {
+                let vals = [0];
+                let current = 0;
+                for(let y=1; y<=yrs; y++) {
+                    for(let m=1; m<=12; m++) {
+                        sipSet.forEach(inv => {
+                            const r = calculateExpectedReturn(inv);
+                            const mRate = Math.pow(1+r, 1/12)-1;
+                            const amt = (typeof inv.amount !== 'undefined') ? inv.amount : (inv.originalAmount || 0);
+                            current = (current + amt) * (1 + mRate);
+                        });
+                    }
+                    vals.push(current);
+                }
+                return vals;
+            };
+
+            const currentData = run(investments);
+            const originalData = run(investments.map(i => ({...i, amount: i.id === 'placeholder' ? 0 : i.originalAmount})));
+
+            if(chart) chart.destroy();
+            chart = new Chart(document.getElementById('projectionChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Dynamic Rebalanced Strategy', data: currentData, borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.08)', fill: true, tension: 0.3, pointRadius: 2 },
+                        { label: 'Original Static Portfolio', data: originalData, borderColor: '#94a3b8', borderDash: [5, 5], tension: 0.3, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${format(c.parsed.y)}` } }
+                    },
+                    scales: { y: { ticks: { callback: v => format(v) } } }
+                }
+            });
+
+            const curTotal = investments.reduce((s, i) => s + (i.amount || 0), 0) * 12 * yrs;
+
+            document.getElementById('projectionSummary').innerHTML = `
+                <div class="p-5 bg-indigo-50 border border-indigo-100 rounded-xl flex flex-col md:flex-row justify-between items-center">
+                    <div>
+                        <p class="text-xs font-bold text-indigo-500 uppercase tracking-wider">Dynamic Strategy Value</p>
+                        <p class="text-3xl font-extrabold text-indigo-700">${format(currentData[yrs])}</p>
+                    </div>
+                    <div class="text-right mt-3 md:mt-0">
+                        <p class="text-sm font-medium text-gray-500">Total Invested: <span class="text-gray-800">${format(curTotal)}</span></p>
+                        <p class="text-sm font-medium text-gray-500">Wealth Gained: <span class="text-green-600 font-bold">+${format(currentData[yrs]-curTotal)}</span></p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initialize event listeners
+        document.getElementById('yearsToProject').addEventListener('change', projectGrowth);
+
+        // Execute on load
+        distributeTotal();
+        renderResearch();
+    </script>
+</body>
+</html>
