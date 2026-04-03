@@ -335,21 +335,27 @@
             const labels = Array.from({length: yrs + 1}, (_, i) => `Year ${i}`);
 
             const run = (sipSet) => {
-                let vals = [0];
-                let current = 0;
-                for(let y=1; y<=yrs; y++) {
-                    for(let m=1; m<=12; m++) {
-                        sipSet.forEach(inv => {
-                            const r = calculateExpectedReturn(inv);
-                            const mRate = Math.pow(1+r, 1/12)-1;
-                            const amt = (typeof inv.amount !== 'undefined') ? inv.amount : (inv.originalAmount || 0);
-                            current = (current + amt) * (1 + mRate);
-                        });
-                    }
-                    vals.push(current);
-                }
-                return vals;
-            };
+                        let vals = [0];
+                        // Create an array to track the individual balance of each fund starting at 0
+                        let fundBalances = sipSet.map(() => 0); 
+                        
+                        for(let y=1; y<=yrs; y++) {
+                            for(let m=1; m<=12; m++) {
+                                sipSet.forEach((inv, index) => {
+                                    const r = calculateExpectedReturn(inv);
+                                    const mRate = Math.pow(1+r, 1/12)-1;
+                                    const amt = (typeof inv.amount !== 'undefined') ? inv.amount : (inv.originalAmount || 0);
+                                    
+                                    // Only compound THIS specific fund's balance, not the whole portfolio
+                                    fundBalances[index] = (fundBalances[index] + amt) * (1 + mRate);
+                                });
+                            }
+                            // Sum up all individual fund balances to get the yearly total
+                            const currentTotal = fundBalances.reduce((sum, val) => sum + val, 0);
+                            vals.push(currentTotal);
+                        }
+                        return vals;
+                    };
 
             const currentData = run(investments);
             const originalData = run(investments.map(i => ({...i, amount: i.id === 'placeholder' ? 0 : i.originalAmount})));
